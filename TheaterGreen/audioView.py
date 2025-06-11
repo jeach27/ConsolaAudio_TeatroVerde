@@ -1,8 +1,18 @@
 import customtkinter as ctk
 import pygame
 import os
+import sys
 import time
 from tkinter import messagebox
+
+def resource_path(relative_path):
+    """Obtiene la ruta absoluta, compatible con PyInstaller o entorno local."""
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
 
 class AudioView(ctk.CTkFrame):
     def __init__(self, master, app, **kwargs):
@@ -28,7 +38,7 @@ class AudioView(ctk.CTkFrame):
         self.header_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(15, 5))
         self.header_frame.grid_columnconfigure(0, weight=1)
         
-        self.console_title = ctk.CTkLabel(self.header_frame, text="Audios Registrados",
+        self.console_title = ctk.CTkLabel(self.header_frame, text="Consola de Audios",
                                         font=ctk.CTkFont(size=20, weight="bold"))
         self.console_title.grid(row=0, column=0, sticky="w")
         
@@ -272,7 +282,7 @@ class AudioView(ctk.CTkFrame):
             widget.destroy()
 
         # Load from data directory
-        data_dir = "data"
+        data_dir = resource_path("data")
         if os.path.exists(data_dir):
             for filename in os.listdir(data_dir):
                 if filename.lower().endswith(('.wav', '.mp3')):

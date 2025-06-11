@@ -6,6 +6,7 @@ import numpy as np
 import os
 import time
 import threading
+import sys
 from tkinter import filedialog, messagebox
 from datetime import timedelta
 from audioView import AudioView
@@ -16,6 +17,15 @@ try:
 except ImportError:
     print("Pillow no está instalado. Los iconos no se mostrarán.")
     Image = None
+    
+def resource_path(relative_path):
+    """Obtiene la ruta absoluta, compatible con PyInstaller o entorno local."""
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
 
 class SettingsView(ctk.CTkFrame):
     def __init__(self, master, audio_app, **kwargs):
@@ -152,8 +162,9 @@ class SettingsView(ctk.CTkFrame):
             messagebox.showerror("Error", "No hay audio grabado para guardar.")
             return
 
-        os.makedirs("data", exist_ok=True)
-        file_path = os.path.join("data", f"{audio_name}.wav")
+        os.makedirs(resource_path("data"), exist_ok=True)
+        file_path = os.path.join(resource_path("data"), f"{audio_name}.wav")
+
 
         try:
             sf.write(file_path, self.recorded_audio_data, self.sample_rate, format='WAV')
@@ -182,8 +193,8 @@ class SettingsView(ctk.CTkFrame):
             return
 
         try:
-            os.makedirs("data", exist_ok=True)
-            new_file_path = os.path.join("data", f"{audio_name}{os.path.splitext(file_path)[1]}")
+            os.makedirs(resource_path("data"), exist_ok=True)
+            new_file_path = os.path.join(resource_path("data"), f"{audio_name}{os.path.splitext(file_path)[1]}")
             with open(file_path, "rb") as src, open(new_file_path, "wb") as dst:
                 dst.write(src.read())
         except Exception as e:
@@ -200,7 +211,7 @@ class App(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("Controlador Audiovisual")
+        self.title("Consola Audio - JEACH")
         self.geometry("1000x700")
         self.minsize(800, 600)
 
@@ -216,24 +227,33 @@ class App(ctk.CTk):
         self.navigation_frame.grid(row=0, column=0, sticky="nsew")
         self.navigation_frame.grid_rowconfigure(4, weight=1)
 
-        self.app_title = ctk.CTkLabel(self.navigation_frame, text="AV Controller",
+        self.app_title = ctk.CTkLabel(self.navigation_frame, text="Controlador de Audiovisuales",
                                       font=ctk.CTkFont(size=20, weight="bold"))
         self.app_title.grid(row=0, column=0, padx=20, pady=20)
 
+        self.audio_icon = self.load_icon("audio_icon.png")
+        self.video_icon = self.load_icon("video_icon.png")
+        self.settings_icon = self.load_icon("settings_icon.png")
+
         self.audio_button = ctk.CTkButton(self.navigation_frame, text="Audio",
                                           command=self.show_audio_view,
-                                          font=ctk.CTkFont(size=16))
+                                          font=ctk.CTkFont(size=16),image=self.audio_icon)
         self.audio_button.grid(row=1, column=0, sticky="ew", padx=10, pady=5)
 
         self.video_button = ctk.CTkButton(self.navigation_frame, text="Video",
                                           command=self.show_video_view,
-                                          font=ctk.CTkFont(size=16))
+                                          font=ctk.CTkFont(size=16),image=self.video_icon)
         self.video_button.grid(row=2, column=0, sticky="ew", padx=10, pady=5)
 
         self.settings_button = ctk.CTkButton(self.navigation_frame, text="Ajustes",
                                              command=self.show_settings_view,
-                                             font=ctk.CTkFont(size=14))
+                                             font=ctk.CTkFont(size=14),image=self.settings_icon)
         self.settings_button.grid(row=5, column=0, sticky="s", padx=10, pady=10)
+
+        self.footer_label = ctk.CTkLabel(self.navigation_frame, text="By JEACH",
+                                 font=ctk.CTkFont(size=12, weight="normal"),
+                                 text_color="gray")
+        self.footer_label.grid(row=6, column=0, sticky="s", padx=10, pady=10)
 
         self.content_frame = ctk.CTkFrame(self.main_container, corner_radius=0, fg_color="transparent")
         self.content_frame.grid(row=0, column=1, sticky="nsew", padx=0, pady=0)
@@ -250,7 +270,7 @@ class App(ctk.CTk):
         if Image is None:
             return None
         try:
-            icon_path = os.path.join("assets", icon_name)
+            icon_path = resource_path(os.path.join("assets", icon_name))
             if not os.path.exists(icon_path):
                 return None
             image = ctk.CTkImage(light_image=Image.open(icon_path),

@@ -13,5 +13,5 @@ class VideoView(ctk.CTkFrame):
                                   font=ctk.CTkFont(size=24, weight="bold"))
         self.label.grid(row=0, column=0, padx=20, pady=20)
 
-        self.info_label = ctk.CTkLabel(self, text="Aquí irán los controles y visualización de video.")
+        self.info_label = ctk.CTkLabel(self, text="Vista en desarrollo...")
         self.info_label.grid(row=1, column=0, padx=20, pady=10)
