@@ -18,15 +18,22 @@ try:
 except ImportError:
     print("Pillow no está instalado. Los iconos no se mostrarán.")
     Image = None
-    
+
 def resource_path(relative_path):
-    """Obtiene la ruta absoluta, compatible con PyInstaller o entorno local."""
+    """Obtiene la ruta absoluta para recursos empaquetados."""
     try:
         base_path = sys._MEIPASS
     except Exception:
         base_path = os.path.abspath(".")
-
     return os.path.join(base_path, relative_path)
+
+def get_data_path(subpath=""):
+    """Obtiene la ruta para datos persistentes."""
+    if getattr(sys, 'frozen', False):
+        base_path = os.path.dirname(sys.executable)
+    else:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base_path, subpath)
 
 class SettingsView(ctk.CTkFrame):
     def __init__(self, master, audio_app, **kwargs):
@@ -163,8 +170,9 @@ class SettingsView(ctk.CTkFrame):
             messagebox.showerror("Error", "No hay audio grabado para guardar.")
             return
 
-        os.makedirs(resource_path("data"), exist_ok=True)
-        file_path = os.path.join(resource_path("data"), f"{audio_name}.wav")
+        data_dir = get_data_path("data")
+        os.makedirs(data_dir, exist_ok=True)
+        file_path = os.path.join(data_dir, f"{audio_name}.wav")
 
         try:
             sf.write(file_path, self.recorded_audio_data, self.sample_rate, format='WAV')
@@ -194,8 +202,9 @@ class SettingsView(ctk.CTkFrame):
             return
 
         try:
-            os.makedirs(resource_path("data"), exist_ok=True)
-            new_file_path = os.path.join(resource_path("data"), f"{audio_name}{os.path.splitext(file_path)[1]}")
+            data_dir = get_data_path("data")
+            os.makedirs(data_dir, exist_ok=True)
+            new_file_path = os.path.join(data_dir, f"{audio_name}{os.path.splitext(file_path)[1]}")
             with open(file_path, "rb") as src, open(new_file_path, "wb") as dst:
                 dst.write(src.read())
         except Exception as e:
@@ -312,7 +321,7 @@ class App(ctk.CTk):
 
     def load_audios(self):
         """Load audios from JSON file if it exists, otherwise return empty list."""
-        json_path = resource_path("audios.json")
+        json_path = get_data_path("audios.json")
         if os.path.exists(json_path):
             try:
                 with open(json_path, 'r', encoding='utf-8') as f:
@@ -326,7 +335,7 @@ class App(ctk.CTk):
 
     def save_audios(self):
         """Save audios to JSON file."""
-        json_path = resource_path("audios.json")
+        json_path = get_data_path("audios.json")
         try:
             with open(json_path, 'w', encoding='utf-8') as f:
                 json.dump(self.audios, f, ensure_ascii=False, indent=4)
@@ -339,3 +348,6 @@ if __name__ == "__main__":
     pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=4096)
     app = App()
     app.mainloop()
+
+# pyinstaller --onefile --noconsole --add-data "assets;assets" --add-data "data;data" --hidden-import="customtkinter" 
+# --hidden-import="sounddevice" --hidden-import="soundfile" --hidden-import="pygame" --hidden-import="numpy" --hidden-import="PIL" main.py

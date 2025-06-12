@@ -6,13 +6,20 @@ import time
 from tkinter import messagebox
 
 def resource_path(relative_path):
-    """Obtiene la ruta absoluta, compatible con PyInstaller o entorno local."""
+    """Obtiene la ruta absoluta para recursos empaquetados."""
     try:
         base_path = sys._MEIPASS
     except Exception:
         base_path = os.path.abspath(".")
-
     return os.path.join(base_path, relative_path)
+
+def get_data_path(subpath=""):
+    """Obtiene la ruta para datos persistentes."""
+    if getattr(sys, 'frozen', False):
+        base_path = os.path.dirname(sys.executable)
+    else:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base_path, subpath)
 
 class AudioView(ctk.CTkFrame):
     def __init__(self, master, app, **kwargs):
@@ -62,20 +69,13 @@ class AudioView(ctk.CTkFrame):
         """Stop any currently playing audio and clean up resources"""
         if self.currently_playing:
             try:
-                # Detener y descargar la música
                 pygame.mixer.music.stop()
                 pygame.mixer.music.unload()
-                
-                # Esperar un breve momento para liberar recursos
-                time.sleep(0.1)
-                
-                # Reiniciar el mixer para asegurar la liberación del archivo
+                time.sleep(0.5)  # Increased delay for resource release
                 pygame.mixer.quit()
                 pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=4096)
-                
             except Exception as e:
                 print(f"Error al detener audio: {e}")
-            
             finally:
                 self.currently_playing = None
                 self.is_paused = False
@@ -83,8 +83,6 @@ class AudioView(ctk.CTkFrame):
                 if self.after_id:
                     self.after_cancel(self.after_id)
                     self.after_id = None
-                
-                # Reset buttons on last played frame
                 if self.last_played_frame:
                     self.last_played_frame.pause_button.configure(
                         text="⏸️", 
@@ -107,30 +105,25 @@ class AudioView(ctk.CTkFrame):
         audio_frame.grid_columnconfigure(0, weight=1)
         audio_frame.grid_columnconfigure(1, weight=0)
 
-        # Audio Name
         name_label = ctk.CTkLabel(audio_frame, text=name, font=ctk.CTkFont(size=12, weight="bold"),
                                 wraplength=110)
         name_label.grid(row=0, column=0, padx=5, pady=(5, 0), sticky="n")
 
-        # Play Button (Always Enabled)
         play_button = ctk.CTkButton(audio_frame, text="▶️",
                                   command=lambda p=audio_frame: self.enqueue_audio(p),
                                   width=120, height=70, corner_radius=5, fg_color="#3498DB")
         play_button.grid(row=1, column=0, padx=5, pady=5, sticky="nsew")
 
-        # Pause/Stop Button
         pause_button = ctk.CTkButton(audio_frame, text="⏸️",
                                    command=lambda p=audio_frame: self.pause_audio(p),
                                    width=120, height=20, corner_radius=5, fg_color="#27AE46")
         pause_button.grid(row=2, column=0, padx=5, pady=(0, 5), sticky="nsew")
 
-        # Config Gear Button
         config_button = ctk.CTkButton(audio_frame, text="⚙️",
                                     command=lambda p=audio_frame: self.show_context_menu(p),
                                     width=30, height=30, corner_radius=5)
         config_button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
 
-        # Store buttons for state management
         audio_frame.play_button = play_button
         audio_frame.pause_button = pause_button
 
@@ -141,23 +134,20 @@ class AudioView(ctk.CTkFrame):
             messagebox.showerror("Error", f"El archivo {os.path.basename(file_path)} no existe.")
             return
 
-        # If the same audio is paused, resume it instead of playing again
         if self.currently_playing == file_path and self.is_paused:
             self.resume_audio(audio_frame)
             return
         
-        # Stop current audio if playing
         if pygame.mixer.music.get_busy():
             self.stop_current_audio()
         
-        # Play the new audio immediately (no queue in this version)
         self.play_audio_directly(audio_frame)
 
     def play_audio_directly(self, audio_frame):
         """Play audio immediately (bypassing queue)"""
         file_path = audio_frame.file_path
         try:
-            self.stop_current_audio()  # Stop any currently playing audio
+            self.stop_current_audio()
             
             pygame.mixer.music.load(file_path)
             pygame.mixer.music.play()
@@ -166,7 +156,6 @@ class AudioView(ctk.CTkFrame):
             self.is_paused = False
             self.paused_position = 0
             
-            # Update button states
             audio_frame.pause_button.configure(
                 text="⏸️", 
                 command=lambda p=audio_frame: self.pause_audio(p)
@@ -182,7 +171,6 @@ class AudioView(ctk.CTkFrame):
         if pygame.mixer.music.get_busy():
             self.after_id = self.after(100, self.monitor_playback)
         else:
-            # Playback finished
             if self.last_played_frame:
                 self.last_played_frame.pause_button.configure(
                     text="⏸️", 
@@ -230,68 +218,50 @@ class AudioView(ctk.CTkFrame):
         """Delete audio file and update UI"""
         file_path = audio_frame.file_path
         
-        # Detener y liberar el audio si es el que se está reproduciendo
         if self.currently_playing == file_path:
             self.stop_current_audio()
         
-        # Verificar si el archivo existe
         if not os.path.exists(file_path):
             messagebox.showerror("Error", f"El archivo {os.path.basename(file_path)} no existe.")
             return
 
-        # Intentar eliminar con múltiples estrategias
         max_attempts = 5
         deleted = False
         
         for attempt in range(max_attempts):
             try:
-                # Estrategia 1: Eliminación directa
+                with open(file_path, 'a') as f:
+                    pass
                 os.remove(file_path)
                 deleted = True
                 break
-                
-            except PermissionError:
-                # Estrategia 2: Forzar liberación de recursos
+            except (PermissionError, IOError):
                 try:
                     pygame.mixer.quit()
-                    pygame.mixer.init()
-                    time.sleep(0.2 * (attempt + 1))  # Espera incremental
+                    pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=4096)
+                    time.sleep(0.5 * (attempt + 1))
                     os.remove(file_path)
                     deleted = True
                     break
                 except Exception:
                     continue
-                    
             except Exception as e:
-                if attempt == max_attempts - 1:  # Último intento
-                    messagebox.showerror("Error", 
-                        f"No se pudo eliminar el archivo. Error: {str(e)}")
+                if attempt == max_attempts - 1:
+                    messagebox.showerror("Error", f"No se pudo eliminar el archivo. Error: {str(e)}")
                 time.sleep(0.3)
                 continue
 
         if deleted:
-            # Actualizar la lista de audios y la interfaz
             self.app.audios = [audio for audio in self.app.audios if audio["file_path"] != file_path]
-            self.app.save_audios()  # Save to JSON
+            self.app.save_audios()
             self.load_existing_audios()
             messagebox.showinfo("Éxito", "Audio eliminado correctamente")
 
     def load_existing_audios(self):
-        """Load all audio files from data directory and app's audios list"""
-        # Clear current buttons
+        """Load all audio files from app's audios list"""
         for widget in self.audio_buttons_container.winfo_children():
             widget.destroy()
 
-        # Load from app's audios list (persisted data)
         for audio in self.app.audios:
             if os.path.exists(audio["file_path"]):
                 self.add_audio_button(audio["name"], audio["file_path"])
-
-def is_file_locked(self, filepath):
-    """Check if a file is locked by another process"""
-    try:
-        with open(filepath, 'rb+') as f:
-            pass
-        return False
-    except IOError:
-        return True
