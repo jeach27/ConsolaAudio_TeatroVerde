@@ -7,6 +7,7 @@ import os
 import time
 import threading
 import sys
+import json
 from tkinter import filedialog, messagebox
 from datetime import timedelta
 from audioView import AudioView
@@ -165,7 +166,6 @@ class SettingsView(ctk.CTkFrame):
         os.makedirs(resource_path("data"), exist_ok=True)
         file_path = os.path.join(resource_path("data"), f"{audio_name}.wav")
 
-
         try:
             sf.write(file_path, self.recorded_audio_data, self.sample_rate, format='WAV')
         except Exception as e:
@@ -173,6 +173,7 @@ class SettingsView(ctk.CTkFrame):
             return
 
         self.app.audios.append({"name": audio_name, "file_path": file_path, "description": audio_desc})
+        self.app.save_audios()  # Save to JSON
         self.app.refresh_audio_view()  # Refresh Audio View
 
         self.audio_name_entry.delete(0, "end")
@@ -202,6 +203,7 @@ class SettingsView(ctk.CTkFrame):
             return
 
         self.app.audios.append({"name": audio_name, "file_path": new_file_path, "description": audio_desc})
+        self.app.save_audios()  # Save to JSON
         self.app.refresh_audio_view()  # Refresh Audio View
 
         self.audio_name_entry.delete(0, "end")
@@ -215,7 +217,7 @@ class App(ctk.CTk):
         self.geometry("1000x700")
         self.minsize(800, 600)
 
-        self.audios = []
+        self.audios = self.load_audios()  # Load persisted audios
 
         self.main_container = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
         self.main_container.pack(fill="both", expand=True)
@@ -237,17 +239,17 @@ class App(ctk.CTk):
 
         self.audio_button = ctk.CTkButton(self.navigation_frame, text="Audio",
                                           command=self.show_audio_view,
-                                          font=ctk.CTkFont(size=16),image=self.audio_icon)
+                                          font=ctk.CTkFont(size=16), image=self.audio_icon)
         self.audio_button.grid(row=1, column=0, sticky="ew", padx=10, pady=5)
 
         self.video_button = ctk.CTkButton(self.navigation_frame, text="Video",
                                           command=self.show_video_view,
-                                          font=ctk.CTkFont(size=16),image=self.video_icon)
+                                          font=ctk.CTkFont(size=16), image=self.video_icon)
         self.video_button.grid(row=2, column=0, sticky="ew", padx=10, pady=5)
 
         self.settings_button = ctk.CTkButton(self.navigation_frame, text="Ajustes",
                                              command=self.show_settings_view,
-                                             font=ctk.CTkFont(size=14),image=self.settings_icon)
+                                             font=ctk.CTkFont(size=14), image=self.settings_icon)
         self.settings_button.grid(row=5, column=0, sticky="s", padx=10, pady=10)
 
         self.footer_label = ctk.CTkLabel(self.navigation_frame, text="By JEACH",
@@ -308,10 +310,32 @@ class App(ctk.CTk):
     def refresh_audio_view(self):
         self.audio_view.load_existing_audios()  # Refresh the Audio View with updated audios
 
+    def load_audios(self):
+        """Load audios from JSON file if it exists, otherwise return empty list."""
+        json_path = resource_path("audios.json")
+        if os.path.exists(json_path):
+            try:
+                with open(json_path, 'r', encoding='utf-8') as f:
+                    audios = json.load(f)
+                # Verify file paths exist
+                return [audio for audio in audios if os.path.exists(audio["file_path"])]
+            except (json.JSONDecodeError, Exception) as e:
+                print(f"Error loading audios from JSON: {e}")
+                return []
+        return []
+
+    def save_audios(self):
+        """Save audios to JSON file."""
+        json_path = resource_path("audios.json")
+        try:
+            with open(json_path, 'w', encoding='utf-8') as f:
+                json.dump(self.audios, f, ensure_ascii=False, indent=4)
+        except Exception as e:
+            print(f"Error saving audios to JSON: {e}")
+
 if __name__ == "__main__":
     ctk.set_appearance_mode("Dark")
     ctk.set_default_color_theme("blue")
     pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=4096)
     app = App()
     app.mainloop()
-

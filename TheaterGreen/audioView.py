@@ -54,7 +54,7 @@ class AudioView(ctk.CTkFrame):
         self.load_existing_audios()
 
     def refresh_audios(self):
-        """Reload all audios from disk"""
+        """Reload all audios from disk and update UI"""
         self.stop_current_audio()
         self.load_existing_audios()
     
@@ -272,32 +272,17 @@ class AudioView(ctk.CTkFrame):
         if deleted:
             # Actualizar la lista de audios y la interfaz
             self.app.audios = [audio for audio in self.app.audios if audio["file_path"] != file_path]
+            self.app.save_audios()  # Save to JSON
             self.load_existing_audios()
             messagebox.showinfo("Éxito", "Audio eliminado correctamente")
 
     def load_existing_audios(self):
-        """Load all audio files from data directory"""
+        """Load all audio files from data directory and app's audios list"""
         # Clear current buttons
         for widget in self.audio_buttons_container.winfo_children():
             widget.destroy()
 
-        # Load from data directory
-        data_dir = resource_path("data")
-        if os.path.exists(data_dir):
-            for filename in os.listdir(data_dir):
-                if filename.lower().endswith(('.wav', '.mp3')):
-                    file_path = os.path.join(data_dir, filename)
-                    name = os.path.splitext(filename)[0]
-                    
-                    # Add to app's audio list if not already there
-                    if not any(a["file_path"] == file_path for a in self.app.audios):
-                        self.app.audios.append({
-                            "name": name, 
-                            "file_path": file_path, 
-                            "description": ""
-                        })
-
-        # Create buttons for each audio
+        # Load from app's audios list (persisted data)
         for audio in self.app.audios:
             if os.path.exists(audio["file_path"]):
                 self.add_audio_button(audio["name"], audio["file_path"])
